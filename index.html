@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>81宮格（行業＋分會＋十色亮燈＋九區淡底色）</title>
+<style>
+  :root{
+    --gap:6px; --radius:10px; --border:#ced4da;
+    --b0:#fff0f0; --b1:#fff7db; --b2:#eefce9;
+    --b3:#e8f9ff; --b4:#f3f3f3; --b5:#f2ecff;
+    --b6:#fff3e6; --b7:#e8f2ff; --b8:#fde5f0;
+  }
+  body{ margin:0; background:#f8f9fa; font-family:sans-serif; padding:16px; display:flex; flex-direction:column; align-items:center; }
+  .bar{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  input, button{ padding:6px 10px; border:1px solid var(--border); border-radius:8px; font-size:14px; }
+  button{ cursor:pointer; background:#fff; }
+  .grid{ display:grid; grid-template-columns:repeat(9,1fr); gap:var(--gap); width:min(95vmin,800px); }
+  .cell{ border:2px solid var(--border); border-radius:var(--radius); aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; }
+  .cell .label{ padding:4px; text-align:center; font-size:clamp(10px,1.5vmin,16px); font-weight:600; word-break:break-word; z-index:1; }
+  .drawer{ position:fixed; right:20px; top:20px; width:320px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px; display:none; flex-direction:column; gap:6px; }
+  .drawer.open{ display:flex; }
+  .colors{ display:flex; flex-wrap:wrap; gap:4px; }
+  .color-btn{ width:24px; height:24px; border-radius:6px; border:1px solid #ccc; cursor:pointer; }
+  @media print{
+    .bar, .drawer{ display:none !important; }
+    body{ padding:0; }
+    .grid{ gap:4px; }
+    @page{ size:A4 portrait; margin:10mm; }
+  }
+</style>
+</head>
+<body>
+  <h2>81宮格（整頁行業＋分會＋十色亮燈＋九區淡底色）</h2>
+  <div class="bar">
+    <input id="industry" placeholder="行業別" />
+    <input id="chapter" placeholder="分會" />
+    <input id="docId" placeholder="文件ID" />
+    <button id="saveBtn">存檔</button>
+    <button id="loadBtn">載入</button>
+    <button id="searchBtn">搜尋</button>
+    <button onclick="window.print()">匯出PDF</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="drawer" id="drawer">
+    <h3>編輯格子 <span id="cellIndex"></span></h3>
+    <textarea id="cellText" rows="4" placeholder="輸入內容"></textarea>
+    <div class="colors" id="colorPicker"></div>
+    <button id="clearColorBtn">清除顏色</button>
+    <button id="okBtn">確定</button>
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+  const firebaseConfig = {"apiKey": "AIzaSyBxiSxwkh4TT8X0p-meD-qHXShiiJ0NDV8", "authDomain": "grid-b24fa.firebaseapp.com", "projectId": "grid-b24fa", "storageBucket": "grid-b24fa.firebasestorage.app", "messagingSenderId": "43132292109", "appId": "1:43132292109:web:264e8601897712f0109944", "measurementId": "G-ZCX79SMRJE"};
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  let meta = { industry:"", chapter:"" };
+  let state = Array.from({length:81},()=>({text:"", color:""}));
+
+  const grid=document.getElementById('grid');
+  const drawer=document.getElementById('drawer');
+  const cellIndexSpan=document.getElementById('cellIndex');
+  const cellText=document.getElementById('cellText');
+  const colorPicker=document.getElementById('colorPicker');
+  let editingIndex=null;
+
+  // 淡底色區塊
+  function blockClass(i){
+    const r=Math.floor(i/9),c=i%9;
+    return 'b'+(Math.floor(r/3)*3+Math.floor(c/3));
+  }
+  const blockColors=["#fff0f0","#fff7db","#eefce9","#e8f9ff","#f3f3f3","#f2ecff","#fff3e6","#e8f2ff","#fde5f0"];
+
+  // 10種亮燈顏色
+  const colors=["#ff6b6b","#ffa94d","#ffd43b","#69db7c","#4dabf7","#9775fa","#f783ac","#868e96","#20c997","#ffffff"];
+  colors.forEach(c=>{
+    const btn=document.createElement('div');
+    btn.className='color-btn'; btn.style.background=c;
+    btn.onclick=()=>{ if(editingIndex!=null){ state[editingIndex].color=c; render(); }};
+    colorPicker.appendChild(btn);
+  });
+
+  document.getElementById('clearColorBtn').onclick=()=>{
+    if(editingIndex!=null){ state[editingIndex].color=""; render(); }
+  };
+
+  function render(){
+    grid.innerHTML="";
+    state.forEach((s,i)=>{
+      const c=document.createElement('div');
+      c.className='cell';
+      const baseColor=blockColors[parseInt(blockClass(i).slice(1))];
+      c.style.background= s.color || baseColor;
+      const lab=document.createElement('div');
+      lab.className='label'; lab.textContent=s.text||"";
+      c.appendChild(lab);
+      c.onclick=()=>openEditor(i);
+      grid.appendChild(c);
+    });
+  }
+
+  function openEditor(i){
+    editingIndex=i; drawer.classList.add('open'); cellIndexSpan.textContent=i+1;
+    cellText.value=state[i].text||"";
+  }
+  document.getElementById('okBtn').onclick=()=>{
+    if(editingIndex!=null){ state[editingIndex].text=cellText.value; render(); }
+    drawer.classList.remove('open');
+  };
+
+  async function save(){
+    const docId=document.getElementById('docId').value||"default";
+    meta.industry=document.getElementById('industry').value.toLowerCase();
+    meta.chapter=document.getElementById('chapter').value.toLowerCase();
+    await setDoc(doc(db,"grids",docId),{meta,state});
+    alert("已存到 "+docId);
+  }
+  async function load(){
+    const docId=document.getElementById('docId').value||"default";
+    const snap=await getDoc(doc(db,"grids",docId));
+    if(snap.exists()){ const d=snap.data(); meta=d.meta; state=d.state; render();
+      document.getElementById('industry').value=meta.industry;
+      document.getElementById('chapter').value=meta.chapter;
+    } else alert("找不到 "+docId);
+  }
+  async function search(){
+    const ind=document.getElementById('industry').value.toLowerCase();
+    const chap=document.getElementById('chapter').value.toLowerCase();
+    if(!ind||!chap) return alert("請輸入行業別和分會");
+    const q=query(collection(db,"grids"), where("meta.industry","==",ind), where("meta.chapter","==",chap));
+    const snap=await getDocs(q);
+    if(snap.empty) return alert("找不到符合的頁面");
+    const d=snap.docs[0].data(); meta=d.meta; state=d.state; render();
+    document.getElementById('docId').value=snap.docs[0].id;
+  }
+
+  document.getElementById('saveBtn').onclick=save;
+  document.getElementById('loadBtn').onclick=load;
+  document.getElementById('searchBtn').onclick=search;
+
+  render();
+</script>
+</body>
+</html>
