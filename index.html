@@ -69,6 +69,24 @@
   const cellText=document.getElementById('cellText');
   const colorPicker=document.getElementById('colorPicker');
   let editingIndex=null;
+  // === Inner→Outer center TEXT-ONLY sync ===
+  const idx = (r,c)=> r*9 + c;
+  const innerToOuter = new Map([
+    [idx(3,3), idx(1,1)], // ↖ → 左上
+    [idx(3,4), idx(1,4)], // ↑ → 上中
+    [idx(3,5), idx(1,7)], // ↗ → 右上
+    [idx(4,5), idx(4,7)], // → → 中右
+    [idx(5,5), idx(7,7)], // ↘ → 右下
+    [idx(5,4), idx(7,4)], // ↓ → 下中
+    [idx(5,3), idx(7,1)], // ↙ → 左下
+    [idx(4,3), idx(4,1)], // ← → 中左
+  ]);
+  function syncOuterText(i){
+    const j = innerToOuter.get(i);
+    if (j==null) return;
+    state[j].text = state[i].text || "";
+  }
+
 
   // 淡底色區塊
   function blockClass(i){
@@ -106,6 +124,15 @@
   }
 
   function openEditor(i){
+  // Live typing → text-only sync
+  cellText.addEventListener('input', ()=>{
+    if(editingIndex!=null){
+      state[editingIndex].text = cellText.value;
+      syncOuterText(editingIndex);
+      render();
+    }
+  });
+
     editingIndex=i; drawer.classList.add('open'); cellIndexSpan.textContent=i+1;
     cellText.value=state[i].text||"";
   }
@@ -146,5 +173,7 @@
 
   render();
 </script>
+
+
 </body>
 </html>
