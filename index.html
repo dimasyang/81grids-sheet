@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>81宮格（行業＋分會＋十色亮燈＋九區淡底色）</title>
+<title>81宮格（行業＋分會＋十色亮燈＋九區淡底色）— 修正版</title>
 <style>
   :root{
     --gap:6px; --radius:10px; --border:#ced4da;
@@ -22,8 +22,11 @@
   .drawer.open{ display:flex; }
   .colors{ display:flex; flex-wrap:wrap; gap:4px; }
   .color-btn{ width:24px; height:24px; border-radius:6px; border:1px solid #ccc; cursor:pointer; }
+  .hint{ font-size:13px; color:#495057; background:#fff; border:1px dashed #ced4da; border-radius:10px; padding:10px 12px; margin-bottom:12px; max-width:820px;}
+  .muted{ color:#6c757d; font-size:12px; }
+  .status{ margin-top:8px; min-height:20px; font-size:13px; color:#343a40; }
   @media print{
-    .bar, .drawer{ display:none !important; }
+    .bar, .drawer, .hint, .status{ display:none !important; }
     body{ padding:0; }
     .grid{ gap:4px; }
     @page{ size:A4 portrait; margin:10mm; }
@@ -32,6 +35,15 @@
 </head>
 <body>
   <h2>81宮格（整頁行業＋分會＋十色亮燈＋九區淡底色）</h2>
+
+  <div class="hint">
+    <strong>使用說明：</strong><br/>
+    1) <u>行業別可能重複</u>，<b>搜尋一定要同時輸入「行業別＋分會」</b> 才能正確找到對應頁面。<br/>
+    2) 存檔時請填入「文件ID」。若未填，系統會自動產生唯一 ID（不會覆蓋上一份）。<br/>
+    3) 若點「載入」，會用輸入框內的「文件ID」載入那一份資料。<br/>
+    <span class="muted">小提醒：若 Firestore 要求建立索引，依提示建立即可（等數分鐘生效）。</span>
+  </div>
+
   <div class="bar">
     <input id="industry" placeholder="行業別" />
     <input id="chapter" placeholder="分會" />
@@ -43,6 +55,7 @@
   </div>
 
   <div class="grid" id="grid"></div>
+  <div class="status" id="status"></div>
 
   <div class="drawer" id="drawer">
     <h3>編輯格子 <span id="cellIndex"></span></h3>
@@ -68,18 +81,24 @@
   const cellIndexSpan=document.getElementById('cellIndex');
   const cellText=document.getElementById('cellText');
   const colorPicker=document.getElementById('colorPicker');
+  const statusEl=document.getElementById('status');
   let editingIndex=null;
-  // === Inner→Outer center TEXT-ONLY sync ===
+
+  const showStatus = (msg, isError=false)=>{
+    statusEl.textContent = msg || "";
+    statusEl.style.color = isError ? "#d9480f" : "#343a40";
+  };
+
   const idx = (r,c)=> r*9 + c;
   const innerToOuter = new Map([
-    [idx(3,3), idx(1,1)], // ↖ → 左上
-    [idx(3,4), idx(1,4)], // ↑ → 上中
-    [idx(3,5), idx(1,7)], // ↗ → 右上
-    [idx(4,5), idx(4,7)], // → → 中右
-    [idx(5,5), idx(7,7)], // ↘ → 右下
-    [idx(5,4), idx(7,4)], // ↓ → 下中
-    [idx(5,3), idx(7,1)], // ↙ → 左下
-    [idx(4,3), idx(4,1)], // ← → 中左
+    [idx(3,3), idx(1,1)],
+    [idx(3,4), idx(1,4)],
+    [idx(3,5), idx(1,7)],
+    [idx(4,5), idx(4,7)],
+    [idx(5,5), idx(7,7)],
+    [idx(5,4), idx(7,4)],
+    [idx(5,3), idx(7,1)],
+    [idx(4,3), idx(4,1)],
   ]);
   function syncOuterText(i){
     const j = innerToOuter.get(i);
@@ -87,22 +106,23 @@
     state[j].text = state[i].text || "";
   }
 
-
-  // 淡底色區塊
   function blockClass(i){
     const r=Math.floor(i/9),c=i%9;
     return 'b'+(Math.floor(r/3)*3+Math.floor(c/3));
   }
   const blockColors=["#fff0f0","#fff7db","#eefce9","#e8f9ff","#f3f3f3","#f2ecff","#fff3e6","#e8f2ff","#fde5f0"];
 
-  // 10種亮燈顏色
   const colors=["#ff6b6b","#ffa94d","#ffd43b","#69db7c","#4dabf7","#9775fa","#f783ac","#868e96","#20c997","#ffffff"];
-  colors.forEach(c=>{
-    const btn=document.createElement('div');
-    btn.className='color-btn'; btn.style.background=c;
-    btn.onclick=()=>{ if(editingIndex!=null){ state[editingIndex].color=c; render(); }};
-    colorPicker.appendChild(btn);
-  });
+  function buildColorPicker(){
+    colorPicker.innerHTML = "";
+    colors.forEach(c=>{
+      const btn=document.createElement('div');
+      btn.className='color-btn'; btn.style.background=c;
+      btn.onclick=()=>{ if(editingIndex!=null){ state[editingIndex].color=c; render(); }};
+      colorPicker.appendChild(btn);
+    });
+  }
+  buildColorPicker();
 
   document.getElementById('clearColorBtn').onclick=()=>{
     if(editingIndex!=null){ state[editingIndex].color=""; render(); }
@@ -124,7 +144,9 @@
   }
 
   function openEditor(i){
-  // Live typing → text-only sync
+    editingIndex=i; drawer.classList.add('open'); cellIndexSpan.textContent=i+1;
+    cellText.value=state[i].text||"";
+  }
   cellText.addEventListener('input', ()=>{
     if(editingIndex!=null){
       state[editingIndex].text = cellText.value;
@@ -132,39 +154,79 @@
       render();
     }
   });
-
-    editingIndex=i; drawer.classList.add('open'); cellIndexSpan.textContent=i+1;
-    cellText.value=state[i].text||"";
-  }
   document.getElementById('okBtn').onclick=()=>{
     if(editingIndex!=null){ state[editingIndex].text=cellText.value; render(); }
     drawer.classList.remove('open');
   };
 
+  const norm = (s)=> (s||"").trim().toLowerCase();
+
+  function genId(){
+    const d = new Date();
+    const pad = (n)=>String(n).padStart(2,'0');
+    const id = `grid_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${d.getTime()}`;
+    return id;
+    }
+
   async function save(){
-    const docId=document.getElementById('docId').value||"default";
-    meta.industry=document.getElementById('industry').value.toLowerCase();
-    meta.chapter=document.getElementById('chapter').value.toLowerCase();
-    await setDoc(doc(db,"grids",docId),{meta,state});
-    alert("已存到 "+docId);
+    const idInput = document.getElementById('docId');
+    let docId = (idInput.value||"").trim();
+    if(!docId){
+      docId = genId();
+      idInput.value = docId;
+    }
+    meta.industry = norm(document.getElementById('industry').value);
+    meta.chapter  = norm(document.getElementById('chapter').value);
+
+    try{
+      await setDoc(doc(db,"grids",docId),{meta,state});
+      showStatus(`已存到 ${docId}`);
+    }catch(e){
+      console.error(e);
+      showStatus(`存檔失敗：${e?.message||e}`, true);
+    }
   }
+
   async function load(){
-    const docId=document.getElementById('docId').value||"default";
-    const snap=await getDoc(doc(db,"grids",docId));
-    if(snap.exists()){ const d=snap.data(); meta=d.meta; state=d.state; render();
-      document.getElementById('industry').value=meta.industry;
-      document.getElementById('chapter').value=meta.chapter;
-    } else alert("找不到 "+docId);
+    const docId=(document.getElementById('docId').value||"").trim();
+    if(!docId){ showStatus("請先輸入文件ID再載入。", true); return; }
+    try{
+      const snap=await getDoc(doc(db,"grids",docId));
+      if(snap.exists()){
+        const d=snap.data(); meta=d.meta||{industry:"",chapter:""}; state=d.state||state; render();
+        document.getElementById('industry').value=meta.industry||"";
+        document.getElementById('chapter').value=meta.chapter||"";
+        showStatus(`已載入 ${docId}`);
+      } else {
+        showStatus(`找不到 ${docId}`, true);
+      }
+    }catch(e){
+      console.error(e);
+      showStatus(`載入失敗：${e?.message||e}`, true);
+    }
   }
+
   async function search(){
-    const ind=document.getElementById('industry').value.toLowerCase();
-    const chap=document.getElementById('chapter').value.toLowerCase();
-    if(!ind||!chap) return alert("請輸入行業別和分會");
-    const q=query(collection(db,"grids"), where("meta.industry","==",ind), where("meta.chapter","==",chap));
-    const snap=await getDocs(q);
-    if(snap.empty) return alert("找不到符合的頁面");
-    const d=snap.docs[0].data(); meta=d.meta; state=d.state; render();
-    document.getElementById('docId').value=snap.docs[0].id;
+    const ind=norm(document.getElementById('industry').value);
+    const chap=norm(document.getElementById('chapter').value);
+    if(!ind || !chap){ showStatus("搜尋前請同時輸入『行業別』與『分會』。", true); return; }
+
+    try{
+      const q=query(collection(db,"grids"),
+                    where("meta.industry","==",ind),
+                    where("meta.chapter","==",chap));
+      const snap=await getDocs(q);
+      if(snap.empty){ showStatus("找不到符合的頁面（請檢查行業別與分會是否完全一致）。", true); return; }
+      const docSnap = snap.docs[0];
+      const d = docSnap.data();
+      meta=d.meta||{industry:"",chapter:""};
+      state=d.state||state; render();
+      document.getElementById('docId').value=docSnap.id;
+      showStatus(`已載入 ${docSnap.id}`);
+    }catch(e){
+      console.error(e);
+      showStatus(`搜尋失敗：${e?.message||e}`, true);
+    }
   }
 
   document.getElementById('saveBtn').onclick=save;
@@ -173,7 +235,5 @@
 
   render();
 </script>
-
-
 </body>
 </html>
