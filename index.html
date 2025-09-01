@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>81宮格（行業＋分會＋十色亮燈＋九區淡底色）— 修正版</title>
+<title>81宮格（行業＋分會＋十色亮燈＋九區淡底色）— 修正版（說明在底部）</title>
 <style>
   :root{
     --gap:6px; --radius:10px; --border:#ced4da;
@@ -22,7 +22,7 @@
   .drawer.open{ display:flex; }
   .colors{ display:flex; flex-wrap:wrap; gap:4px; }
   .color-btn{ width:24px; height:24px; border-radius:6px; border:1px solid #ccc; cursor:pointer; }
-  .hint{ font-size:13px; color:#495057; background:#fff; border:1px dashed #ced4da; border-radius:10px; padding:10px 12px; margin-bottom:12px; max-width:820px;}
+  .hint{ font-size:13px; color:#495057; background:#fff; border:1px dashed #ced4da; border-radius:10px; padding:10px 12px; margin-top:16px; max-width:820px;}
   .muted{ color:#6c757d; font-size:12px; }
   .status{ margin-top:8px; min-height:20px; font-size:13px; color:#343a40; }
   @media print{
@@ -36,14 +36,6 @@
 <body>
   <h2>81宮格（整頁行業＋分會＋十色亮燈＋九區淡底色）</h2>
 
-  <div class="hint">
-    <strong>使用說明：</strong><br/>
-    1) <u>行業別可能重複</u>，<b>搜尋一定要同時輸入「行業別＋分會」</b> 才能正確找到對應頁面。<br/>
-    2) 存檔時請填入「文件ID」。若未填，系統會自動產生唯一 ID（不會覆蓋上一份）。<br/>
-    3) 若點「載入」，會用輸入框內的「文件ID」載入那一份資料。<br/>
-    <span class="muted">小提醒：若 Firestore 要求建立索引，依提示建立即可（等數分鐘生效）。</span>
-  </div>
-
   <div class="bar">
     <input id="industry" placeholder="行業別" />
     <input id="chapter" placeholder="分會" />
@@ -56,6 +48,14 @@
 
   <div class="grid" id="grid"></div>
   <div class="status" id="status"></div>
+
+  <div class="hint">
+    <strong>使用說明：</strong><br/>
+    1) <u>行業別可能重複</u>，<b>搜尋一定要同時輸入「行業別＋分會」</b> 才能正確找到對應頁面。<br/>
+    2) 存檔時請填入「文件ID」。若未填，系統會自動產生唯一 ID（不會覆蓋上一份）。<br/>
+    3) 若點「載入」，會用輸入框內的「文件ID」載入那一份資料。<br/>
+    <span class="muted">小提醒：若 Firestore 要求建立索引，依提示建立即可（等數分鐘生效）。</span>
+  </div>
 
   <div class="drawer" id="drawer">
     <h3>編輯格子 <span id="cellIndex"></span></h3>
